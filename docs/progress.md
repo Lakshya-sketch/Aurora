@@ -6,6 +6,21 @@ down.
 
 ---
 
+## Entry 88 — 2026-11-12
+
+### Git Repository Initialization & Initial Push to GitHub
+
+**Implemented Actions & Enhancements:**
+1. **Configured Git Exclusions (`.gitignore`):**
+   - Protected local runtime assets by ensuring `data/aurora.db*`, `data/generated/`, `data/*.log*`, `chroma/`, and `.hermes/` are strictly ignored from version control.
+2. **Project Documentation (`README.md`):**
+   - Created a comprehensive root `README.md` covering architecture, features, quick start, prerequisites, and automated testing instructions.
+3. **Repository Setup & Deployment:**
+   - Initialized Git repository, renamed default branch to `main`, and linked remote `https://github.com/Lakshya-sketch/Aurora.git`.
+   - Committed 98 files (22,773 lines) and pushed directly to `origin/main`.
+
+---
+
 ## Entry 87 — 2026-11-11
 
 ### Restored Missing Generated Image & Added Dynamic On-Demand Image Recovery in HTTP Route
