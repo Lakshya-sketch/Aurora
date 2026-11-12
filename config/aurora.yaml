@@ -1,0 +1,103 @@
+# Aurora v2 — runtime configuration
+# Hot-reloadable. Env vars (loaded from `.env` via python-dotenv) can be
+# referenced as ${VAR_NAME}; resolved at config load time.
+#
+# See `architecture.md` for the canonical event topics and plugin
+# contract this config is meant to support.
+
+aurora:
+  # Project root. Single allowed literal path in source code.
+  # See AGENTS.md rule #1. The :-$E:/NeuralChat2 default lets the
+  # tests + smoke runs work without a .env file; in production
+  # AURORA_HOME should be set in .env (or in the launcher script).
+  home: ${AURORA_HOME:-E:/NeuralChat2}
+
+  # Where runtime data lives (DB, logs, vector store, inbox).
+  data_dir: ${AURORA_DATA_DIR:-${AURORA_HOME:-E:/NeuralChat2}/data}
+  log_dir:  ${AURORA_LOG_DIR:-${AURORA_HOME:-E:/NeuralChat2}/data}
+  db_path:  ${AURORA_DB_PATH:-${AURORA_HOME:-E:/NeuralChat2}/data/aurora.db}
+
+  # Log level for the kernel logger. Plugin loggers fall back to this.
+  log_level: ${AURORA_LOG_LEVEL:-INFO}
+
+# ---- Transport (Quart/HTTP + WebSocket) ----
+# Phases 1+ consume this. Listed now so swapping the host/port is
+# a single-file change.
+transport:
+  host: ${AURORA_HOST:-127.0.0.1}
+  port: ${AURORA_PORT:-8765}
+  ws_url: ${AURORA_WS_URL:-ws://127.0.0.1:8765/stream}
+
+# ---- Plugin discovery ----
+plugins:
+  # Where the registry looks for plugin folders.
+  # Each subdir is expected to contain a `plugin.py` exporting a
+  # `BasePlugin` subclass named per the folder (or `PLUGIN`).
+  root: ${AURORA_HOME:-E:/NeuralChat2}/plugins
+
+  # Enable/disable lists. These are reconciled with the env-var
+  # overrides in aurora_core/registry.py.
+  enabled:  []   # empty == all discovered plugins are enabled
+  disabled: []   # all discovered plugins are active
+
+  # Discovery-time behaviour. `safe` = skip plugins that fail to
+  # import and log a warning; `strict` = crash the kernel.
+  on_error: safe
+
+# ---- Event bus ----
+event_bus:
+  # Max events retained in the in-memory ring buffer. Used by tests
+  # and by `/health` introspection. Keep modest; bus is for routing,
+  # not storage.
+  history_size: 256
+  # If true, subscriber exceptions are logged and swallowed (so one
+  # bad plugin can't take down the bus). If false, they propagate.
+  swallow_subscriber_errors: true
+
+# ---- Default plugin-specific config ----
+# Each plugin reads its own sub-key. Listed here so the schema is
+# self-documenting; plugins can add new keys without touching core.
+llm:
+  provider: ollama
+  base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+  default_model: ${OLLAMA_DEFAULT_MODEL:-qwen2.5:3b-instruct-q4_K_M}
+  vlm_model: ${OLLAMA_VLM_MODEL:-qwen3-vl:4b-instruct-q4_K_M}
+  timeout_s: ${OLLAMA_TIMEOUT_S:-120}
+
+embeddings:
+  model: ${AURORA_EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+  device: ${AURORA_EMBED_DEVICE:-cpu}
+
+rag:
+  store: chroma
+  chroma_dir: ${AURORA_CHROMA_DIR:-${AURORA_HOME:-E:/NeuralChat2}/data/chroma}
+  inbox_dir: ${AURORA_INBOX_DIR:-${AURORA_HOME:-E:/NeuralChat2}/data/inbox}
+
+memory:
+  # Mode Selection:
+  #   "standard"    - Installation A: Direct SQLite disk persistence (Low RAM)
+  #   "turbo_cache" - Installation B: In-memory session cache with 1-min flush (High RAM)
+  mode: ${AURORA_MEMORY_MODE:-standard}
+  backend: sqlite
+  db_path: ${AURORA_DB_PATH:-${AURORA_HOME:-E:/NeuralChat2}/data/aurora.db}
+  cache:
+    sync_interval_s: 60
+    max_cached_sessions: 5
+
+vision:
+  ocr: easyocr
+  vlm_provider: ollama
+  vlm_model: ${OLLAMA_VLM_MODEL:-qwen3-vl:4b-instruct-q4_K_M}
+
+image_gen:
+  provider: fooocus
+  base_url: ${FOOOCUS_BASE_URL:-http://127.0.0.1:8888}
+  default_model: fooocus-speed
+  timeout_s: ${FOOOCUS_TIMEOUT_S:-180}
+
+tools:
+  # Confirm dangerous ops by default. UI can override per session.
+  require_confirmation: true
+  # Allowlist of file-system roots tools can touch without prompt.
+  sandbox_roots:
+    - ${AURORA_HOME:-E:/NeuralChat2}

@@ -1,0 +1,28 @@
+# Aurora v2 — Python dependencies
+# Pinned loosely; lock via pip-compile or uv once Phase 1 lands.
+# Tested on Python 3.11.x (Windows).
+
+# --- Core kernel (Phase 0) ---
+PyYAML>=6.0
+python-dotenv>=1.0
+
+# --- Transport (Phase 1) ---
+# Quart = async ASGI microframework. Hypercorn = ASGI server with WS.
+quart>=0.19
+hypercorn>=0.16
+
+# --- Agent (Phase 2) ---
+httpx>=0.27            # async HTTP for Ollama
+websockets>=12         # for any direct WS clients
+# langgraph is added in Phase 2; not needed for the microkernel skeleton.
+
+# --- Plugins (later phases) ---
+# sentence-transformers   # RAG + memory embeddings
+# chromadb                # default vector store
+# easyocr                 # vision plugin
+# pyautogui, pywinauto    # win_automation handlers
+# TTS/STT libs            # voice plugin (v2.1)
+
+# --- Tests ---
+pytest>=8.0
+pytest-asyncio>=0.23
