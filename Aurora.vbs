@@ -12,7 +12,7 @@ Set wshShell = CreateObject("WScript.Shell")
 
 ' 1. Determine Aurora home directory
 auroraHome = fso.GetParentFolderName(WScript.ScriptFullName)
-wshShell.CurrentDirectory = auroraHomecurl http://127.0.0.1:8765/memory/chunks
+wshShell.CurrentDirectory = auroraHome
 
 ' 2. Select Python executable (venv or system python)
 venvPython = auroraHome & "\venv\Scripts\python.exe"

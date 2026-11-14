@@ -6,6 +6,19 @@ down.
 
 ---
 
+## Entry 89 — 2026-11-14
+
+### Bug Fix: VBScript Compilation Error in `Aurora.vbs`
+
+**Implemented Actions & Enhancements:**
+1. **Cleaned Syntax Error (`Aurora.vbs`):**
+   - Removed stray command string (`curl http://127.0.0.1:8765/memory/chunks`) accidentally appended to Line 15 (`wshShell.CurrentDirectory = auroraHome`).
+   - Resolved Microsoft VBScript compilation error `800A0401` ("Expected end of statement").
+2. **Verification:**
+   - Validated VBScript compilation using Windows Script Host (`cscript //Nologo`). 0 errors.
+
+---
+
 ## Entry 88 — 2026-11-12
 
 ### Git Repository Initialization & Initial Push to GitHub
