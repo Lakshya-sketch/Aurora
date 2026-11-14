@@ -6,7 +6,43 @@ Conforms to standard chat completions schema:
 
 from __future__ import annotations
 
-DEFAULT_SYSTEM_PROMPT = (
+import os
+from pathlib import Path
+from typing import Any
+
+
+def get_host_environment_context() -> str:
+    """Detect dynamic Windows host paths and environment rules."""
+    userprofile_str = os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    userprofile = Path(userprofile_str)
+
+    # Detect Desktop (OneDrive redirected or standard)
+    onedrive_desktop = userprofile / "OneDrive" / "Desktop"
+    desktop = onedrive_desktop if onedrive_desktop.exists() else userprofile / "Desktop"
+
+    # Detect Documents (OneDrive redirected or standard)
+    onedrive_docs = userprofile / "OneDrive" / "Documents"
+    docs = onedrive_docs if onedrive_docs.exists() else userprofile / "Documents"
+
+    downloads = userprofile / "Downloads"
+
+    return (
+        "\n\n[HOST ENVIRONMENT & SHELL RULES]\n"
+        "- Operating System: Windows\n"
+        f"- User Home: {userprofile.as_posix()}\n"
+        f"- Real Desktop: {desktop.as_posix()}\n"
+        f"- Real Documents: {docs.as_posix()}\n"
+        f"- Real Downloads: {downloads.as_posix()}\n"
+        "- Terminal Shell: PowerShell is the system shell. Use PowerShell cmdlets (e.g. Set-Content, Out-File, Get-ChildItem). "
+        "Do NOT use Command Prompt (cmd.exe) syntax like %HOMEDRIVE%, %USERPROFILE%, or &&. "
+        "When the user asks to save, create, or read files on their 'Desktop' or 'Documents', ALWAYS use the exact Real Desktop or Documents paths listed above. "
+        "NEVER invent artificial drive root folders like 'E:/Desktop' or 'E:/Users/Public/Desktop'.\n"
+        "- CRITICAL SAFETY RULE: You are strictly forbidden from writing, modifying, moving, or deleting any files inside Windows OS directories "
+        "(such as C:/Windows, System32, Program Files, or Registry). Any attempt to modify system files will be rejected by the Aurora safety guard."
+    )
+
+
+BASE_SYSTEM_INSTRUCTIONS = (
     "You are Aurora, an intelligent local AI assistant running on the user's Windows PC. "
     "You HAVE local system tools available: "
     "rag_search (search through uploaded user documents, code, PDFs, notes, and manuals using semantic vector similarity), "
@@ -21,6 +57,8 @@ DEFAULT_SYSTEM_PROMPT = (
     "When the user asks to find/search files on disk, inspect code structure, open apps, do calculations, or perform system tasks, "
     "you MUST call the appropriate tool. NEVER claim that you lack access to local files or tools."
 )
+
+DEFAULT_SYSTEM_PROMPT = BASE_SYSTEM_INSTRUCTIONS + get_host_environment_context()
 
 
 class PromptBuilder:

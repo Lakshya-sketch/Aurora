@@ -6,6 +6,24 @@ down.
 
 ---
 
+## Entry 91 — 2026-11-14
+
+### Host Environment Context Injection & Windows System File Guard Implementation
+
+**Implemented Actions & Enhancements:**
+1. **Dynamic Host Environment & Path Discovery (`core_logic/prompt_builder.py`):**
+   - Implemented `get_host_environment_context()` to dynamically detect real Windows user directories at runtime (User Home, Desktop with OneDrive support, Documents, Downloads).
+   - Injected authoritative rules into system prompts instructing LLMs to use PowerShell cmdlets, target the real detected Desktop path, and never hallucinate fake roots like `E:\Desktop`.
+2. **Immutable Windows System File Guard (`plugins/tools_builtin/handlers/terminal.py`):**
+   - Implemented `validate_system_file_guard()` as a non-bypassable barrier protecting `C:\Windows`, `System32`, `SysWOW64`, `WinSxS`, `Program Files`, `ProgramData\Microsoft\Windows`, boot files, and HKLM registry hives.
+   - Blocks write, delete, move, permission modification (`takeown`, `icacls`), and redirection operations (`>`, `>>`) targeting operating system paths.
+3. **Automated Safety Suite & Verification (`tests/test_safety_guard.py`):**
+   - Created comprehensive unit tests validating system path mutation blocking, read-only system inspection allowances, and prompt injection rules.
+   - Cleaned up temporary directory `E:\Desktop`.
+   - Verified 188/188 tests pass repository-wide (`pytest`).
+
+---
+
 ## Entry 90 — 2026-11-14
 
 ### Automated Ollama Background Service Launcher in `Aurora.vbs`
