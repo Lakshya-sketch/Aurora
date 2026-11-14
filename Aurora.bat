@@ -25,6 +25,12 @@ start "Aurora Backend" /min "%PY_EXE%" -m aurora_core
 :: Give the backend a moment to bind the port before Electron tries to connect
 timeout /t 3 /nobreak >nul
 
+:: ── Check Node dependencies ─────────────────────────────────────
+if not exist "%AURORA_HOME%\node_modules" (
+    echo [aurora] First run detected: Installing Node dependencies...
+    call npm install --prefix "%AURORA_HOME%"
+)
+
 :: ── Start Electron ────────────────────────────────────────────
 echo [aurora] Starting Electron UI...
 call npm start --prefix "%AURORA_HOME%"

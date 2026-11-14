@@ -225,6 +225,11 @@ async def stats() -> Response:
 
     for plugin in k.plugins:
         if getattr(plugin, "name", "") == "llm_ollama":
+            if hasattr(plugin, "refresh_installed_models"):
+                try:
+                    await plugin.refresh_installed_models()
+                except Exception as exc:
+                    logger.debug("failed to refresh models in /stats: %s", exc)
             active_model = getattr(plugin, "active_model", "Unknown")
             vlm_model = getattr(plugin, "vlm_model", "qwen3-vl:4b-instruct-q4_K_M")
             total_tokens = getattr(plugin, "total_tokens_spent", 0)
@@ -414,6 +419,11 @@ async def models() -> Response:
 
     for plugin in k.plugins:
         if getattr(plugin, "name", "") == "llm_ollama":
+            if hasattr(plugin, "refresh_installed_models"):
+                try:
+                    await plugin.refresh_installed_models()
+                except Exception as exc:
+                    logger.debug("failed to refresh models in /models: %s", exc)
             installed = getattr(plugin, "installed_models", [])
             active = getattr(plugin, "active_model", "Unknown")
             break
@@ -434,6 +444,11 @@ async def set_model() -> Response:
     k = get_kernel()
     for plugin in k.plugins:
         if getattr(plugin, "name", "") == "llm_ollama":
+            if hasattr(plugin, "refresh_installed_models"):
+                try:
+                    await plugin.refresh_installed_models()
+                except Exception:
+                    pass
             installed = getattr(plugin, "installed_models", [])
             if model_name not in installed:
                 return jsonify({"error": f"model '{model_name}' not installed"}), 404

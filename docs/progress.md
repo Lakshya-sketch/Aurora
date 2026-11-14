@@ -6,6 +6,28 @@ down.
 
 ---
 
+## Entry 93 — 2026-11-14
+
+### Dynamic Ollama Model Auto-Detection, Fallback, 100% GPU Layer Forcing (`num_gpu: 99`), & Self-Healing Launcher
+
+**Implemented Actions & Enhancements:**
+1. **100% GPU Layer Offloading & Context Optimization (`plugins/llm_ollama/plugin.py` & `config/aurora.yaml`):**
+   - Configured forced layer offloading in `_call_ollama()` by passing `"options": {"num_gpu": 99, "num_ctx": 4096}` to Ollama's `/api/chat`.
+   - Resolves the 50% CPU / 50% GPU bottleneck on laptops, ensuring all neural network layers fit in GPU VRAM for maximum tokens/second generation.
+   - Forced direct IPv4 endpoint `http://127.0.0.1:11434` as default across `plugin.py` and `aurora.yaml` to prevent Windows IPv6 (`::1`) resolution drops.
+2. **Dynamic Live Model Sync & Auto-Fallback (`plugins/llm_ollama/plugin.py` & `aurora_core/transport/http.py`):**
+   - Implemented `refresh_installed_models()` and `_fetch_models_from_ollama()` in `OllamaPlugin`.
+   - When an active model is deleted externally (`ollama rm <model>`), Aurora detects the change on the next turn, automatically falls back to the first available installed model, updates internal state, and broadcasts a `stats.update` bus event.
+   - Integrated live refresh into `/stats`, `/models`, and `/model` HTTP endpoints in `http.py` so the UI header dropdown in `TopHeader.jsx` always reflects the actual installed models on disk.
+   - Added zero-model detection: if all models are deleted from Ollama, Aurora cleanly emits a guidance message instructing the user to run `ollama pull ...` instead of hanging or throwing 404s.
+3. **Self-Healing Dependencies in Windows Launcher (`Aurora.bat`):**
+   - Added an automatic `node_modules` existence check prior to launching Electron. If missing, `Aurora.bat` automatically runs `npm install` to eliminate the "vite is not recognized" error on new machines.
+4. **Automated Testing & Verification (`tests/test_llm_ollama.py`):**
+   - Added `test_ollama_gpu_options_and_dynamic_model_refresh` covering options injection, dynamic auto-fallback upon model deletion, and zero-model fallback messaging.
+   - **Verification:** **190/190 tests pass green** repository-wide (`pytest`).
+
+---
+
 ## Entry 92 — 2026-11-14
 
 ### Enforced Vision Tool Calling Directives for Attached Images

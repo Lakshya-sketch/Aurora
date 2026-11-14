@@ -40,7 +40,7 @@ class OllamaPlugin(BasePlugin):
 
     def __init__(self) -> None:
         self._ctx: PluginContext | None = None
-        self.base_url: str = "http://localhost:11434"
+        self.base_url: str = "http://127.0.0.1:11434"
         self.default_model: str = "qwen2.5:3b-instruct-q4_K_M"
         self.vlm_model: str = "qwen3-vl:4b-instruct-q4_K_M"
         self._selected_model: str | None = None
@@ -48,6 +48,8 @@ class OllamaPlugin(BasePlugin):
         self.active_model: str = self.get_selected_model()
         self.timeout_s: float = 120.0
         self.total_tokens_spent: int = 0
+        self.num_gpu: int = 99
+        self.num_ctx: int = 4096
         self.installed_models: list[str] = []
         self._tool_schemas: list[dict[str, Any]] = []
         # Pending tool-call futures: call_id -> asyncio.Future
@@ -60,10 +62,12 @@ class OllamaPlugin(BasePlugin):
     async def setup(self, ctx: PluginContext) -> None:
         self._ctx = ctx
         llm_cfg = ctx.config.get("llm", {})
-        self.base_url = str(llm_cfg.get("base_url", "http://localhost:11434")).rstrip("/")
+        self.base_url = str(llm_cfg.get("base_url", "http://127.0.0.1:11434")).rstrip("/")
         self.default_model = str(llm_cfg.get("default_model", "qwen2.5:3b-instruct-q4_K_M"))
         self.vlm_model = str(llm_cfg.get("vlm_model", "qwen3-vl:4b-instruct-q4_K_M"))
         self.timeout_s = float(llm_cfg.get("timeout_s", 120.0))
+        self.num_gpu = int(llm_cfg.get("num_gpu", 99))
+        self.num_ctx = int(llm_cfg.get("num_ctx", 4096))
 
         # Check installed models on setup once
         self.installed_models = await self._get_installed_models()
@@ -106,16 +110,54 @@ class OllamaPlugin(BasePlugin):
             self._ctx.logger.info("llm_ollama shutting down")
         self._ctx = None
 
-    async def _get_installed_models(self) -> list[str]:
+    async def _fetch_models_from_ollama(self) -> tuple[bool, list[str]]:
+        """Fetch live models from Ollama /api/tags.
+
+        Returns:
+            (is_online: bool, model_names: list[str])
+        """
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(3.0)) as client:
                 res = await client.get(f"{self.base_url}/api/tags")
                 if res.status_code == 200:
                     data = res.json()
-                    return [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+                    models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+                    return True, models
         except Exception as exc:
-            logger.warning("failed to fetch ollama models: %s", exc)
-        return []
+            logger.debug("Ollama /api/tags unreachable: %s", exc)
+        return False, []
+
+    async def refresh_installed_models(self) -> list[str]:
+        """Fetch current live models from Ollama and dynamically sync active model."""
+        online, live_models = await self._fetch_models_from_ollama()
+        if online:
+            self.installed_models = live_models
+            usable = [m for m in self.installed_models if any(k in m for k in ["qwen", "gemma", "llama", "mistral", "phi"])]
+            if not usable and self.installed_models:
+                usable = self.installed_models
+
+            if not self.installed_models:
+                self._selected_model = None
+                self.active_model = "None (No models installed)"
+            elif self.active_model not in self.installed_models and usable:
+                # Active model was deleted or changed in Ollama — auto-fallback
+                matched = [m for m in usable if any(part in m for part in self.active_model.split(":")[:1])]
+                self._selected_model = matched[0] if matched else usable[0]
+                self.active_model = self._selected_model
+                if self._ctx:
+                    await self._ctx.bus.publish(
+                        "stats.update",
+                        {
+                            "active_model": self.active_model,
+                            "total_tokens": self.total_tokens_spent,
+                            "installed_models": self.installed_models,
+                        },
+                    )
+        return self.installed_models
+
+    async def _get_installed_models(self) -> list[str]:
+        _, models = await self._fetch_models_from_ollama()
+        return models
 
     # ------------------------------------------------------------------
     # Tool schemas — cached via EventBus from tools.catalog event (Rule 2)
@@ -189,22 +231,35 @@ class OllamaPlugin(BasePlugin):
                     m["images"] = list(payload.get("images"))
                     break
 
-        # Ensure installed models list is populated
-        if not self.installed_models:
-            self.installed_models = await self._get_installed_models()
+        # Refresh live models from Ollama to ensure deleted models are cleared
+        online, live_models = await self._fetch_models_from_ollama()
+        if online:
+            self.installed_models = live_models
+            if not self.installed_models:
+                error_msg = (
+                    "⚠️ No Ollama models are installed. Please run `ollama pull qwen2.5:3b-instruct-q4_K_M` "
+                    "(or any model of your choice) in your terminal."
+                )
+                await self._emit_fallback(session_id, error_msg)
+                return
 
-        usable = [m for m in self.installed_models if any(k in m for k in ["qwen", "gemma", "llama", "mistral", "phi"])]
-        if not usable and self.installed_models:
-            usable = self.installed_models
+            usable = [m for m in self.installed_models if any(k in m for k in ["qwen", "gemma", "llama", "mistral", "phi"])]
+            if not usable and self.installed_models:
+                usable = self.installed_models
 
-        # Model selection: use installed models if needed
-        target_model = requested_model
-        if usable and target_model not in self.installed_models:
-            matched = [m for m in usable if target_model.split(":")[0] in m]
-            target_model = matched[0] if matched else usable[0]
+            # Model selection: use installed models if needed
+            target_model = requested_model
+            if usable and target_model not in self.installed_models:
+                matched = [m for m in usable if any(part in m for part in target_model.split(":")[:1])]
+                target_model = matched[0] if matched else usable[0]
 
-        self._selected_model = target_model
-        self.active_model = target_model
+            self._selected_model = target_model
+            self.active_model = target_model
+        else:
+            # Ollama is offline or unreachable - keep current target model so _call_ollama handles connection error
+            target_model = requested_model or self.get_selected_model()
+            self._selected_model = target_model
+            self.active_model = target_model
 
         # Terminal output via stderr so Electron shows it as [py:err]
         prompt_text = messages[-1].get("content", "") if messages else ""
@@ -531,11 +586,15 @@ class OllamaPlugin(BasePlugin):
         assert self._ctx is not None
         endpoint = f"{self.base_url}/api/chat"
 
-        # Build request body
+        # Build request body with forced GPU offloading and tuned context
         req_body: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "stream": True,
+            "options": {
+                "num_gpu": getattr(self, "num_gpu", 99),
+                "num_ctx": getattr(self, "num_ctx", 4096),
+            },
         }
         if tool_schemas:
             req_body["tools"] = tool_schemas

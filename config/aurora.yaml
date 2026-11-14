@@ -59,10 +59,12 @@ event_bus:
 # self-documenting; plugins can add new keys without touching core.
 llm:
   provider: ollama
-  base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+  base_url: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
   default_model: ${OLLAMA_DEFAULT_MODEL:-qwen2.5:3b-instruct-q4_K_M}
   vlm_model: ${OLLAMA_VLM_MODEL:-qwen3-vl:4b-instruct-q4_K_M}
   timeout_s: ${OLLAMA_TIMEOUT_S:-120}
+  num_gpu: ${OLLAMA_NUM_GPU:-99}
+  num_ctx: ${OLLAMA_NUM_CTX:-4096}
 
 embeddings:
   model: ${AURORA_EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}

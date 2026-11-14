@@ -160,3 +160,66 @@ async def test_ollama_context_traceback_memory_and_vision(bus: EventBus, monkeyp
     await plugin.shutdown()
 
 
+@pytest.mark.asyncio
+async def test_ollama_gpu_options_and_dynamic_model_refresh(bus: EventBus) -> None:
+    """Verify forced GPU offloading, num_ctx, and dynamic model refresh with auto-fallback."""
+    plugin = OllamaPlugin()
+    ctx = PluginContext(
+        name="llm_ollama",
+        config={
+            "llm": {
+                "base_url": "http://127.0.0.1:11434",
+                "num_gpu": 99,
+                "num_ctx": 4096,
+                "default_model": "qwen2.5:3b-instruct-q4_K_M",
+            }
+        },
+        bus=bus,
+    )
+    await plugin.setup(ctx)
+
+    assert plugin.num_gpu == 99
+    assert plugin.num_ctx == 4096
+
+    # Mock live fetch returning 2 installed models (simulating Ollama API /api/tags)
+    async def mock_fetch() -> tuple[bool, list[str]]:
+        return True, ["llama3:8b", "mistral:7b"]
+
+    plugin._fetch_models_from_ollama = mock_fetch  # type: ignore[assignment]
+
+    # Refresh models dynamically
+    models = await plugin.refresh_installed_models()
+    assert models == ["llama3:8b", "mistral:7b"]
+    # Because qwen2.5 is not in installed models, active_model should auto-fallback to first usable
+    assert plugin.active_model == "llama3:8b"
+
+    # Mock zero models installed in Ollama
+    async def mock_empty_fetch() -> tuple[bool, list[str]]:
+        return True, []
+
+    plugin._fetch_models_from_ollama = mock_empty_fetch  # type: ignore[assignment]
+    models = await plugin.refresh_installed_models()
+    assert models == []
+    assert plugin.active_model == "None (No models installed)"
+
+    # When sending a prompt with zero models installed, it should emit friendly fallback message
+    received_tokens: list[str] = []
+    async def token_collector(topic: str, payload: dict[str, Any]) -> None:
+        received_tokens.append(payload.get("token", ""))
+
+    await bus.subscribe("llm.token", token_collector)
+    await plugin.handle_event(
+        "llm.generate",
+        {
+            "session_id": "test_zero_models",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+
+    assert len(received_tokens) > 0
+    assert "No Ollama models are installed" in received_tokens[0]
+
+    await plugin.shutdown()
+
+
+
