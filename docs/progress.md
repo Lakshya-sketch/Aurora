@@ -6,6 +6,20 @@ down.
 
 ---
 
+## Entry 90 — 2026-11-14
+
+### Automated Ollama Background Service Launcher in `Aurora.vbs`
+
+**Implemented Actions & Enhancements:**
+1. **Integrated Smart Ollama Process Detection (`Aurora.vbs`):**
+   - Added `AUTO_START_OLLAMA = True` configuration flag to `Aurora.vbs`.
+   - Utilizes WMI (`Win32_Process`) with error suppression to detect if `ollama.exe` or `ollama app.exe` is already running.
+   - If offline, silently launches `ollama serve` in the background with `WindowStyle = 0` (zero console window flash) and pauses briefly to let port 11434 bind before the backend loads.
+2. **Verification:**
+   - Validated VBScript compilation via Windows Script Host (`cscript //Nologo`). 0 errors.
+
+---
+
 ## Entry 89 — 2026-11-14
 
 ### Bug Fix: VBScript Compilation Error in `Aurora.vbs`
