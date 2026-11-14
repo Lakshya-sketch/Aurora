@@ -53,6 +53,7 @@ BASE_SYSTEM_INSTRUCTIONS = (
     "inspect_image (inspect attached images/photos using the Vision Subagent to transcribe code, read text, or describe layout), "
     "get_symbol_map (inspect code AST/structure), find_definitions (locate classes/functions), and find_callers (find usages). "
     "When answering questions about documents, code, or files the user has shared or uploaded, rely on the injected reference excerpts, attached files, or call rag_search. "
+    "MANDATORY VISION DIRECTIVE: You cannot see raw image pixels directly. Whenever an image is attached or the user references an image or screenshot ('in this code', 'why is this highlighted', 'look at this', etc.), you MUST call the `inspect_image` tool to read, OCR, and analyze the image before providing your answer. Never guess or provide generic answers without inspecting the image first. "
     "Only search this assistant's own codebase (E:/NeuralChat2) if the user explicitly asks about Aurora's internal codebase or implementation. Do NOT confuse Aurora's internal code with user-attached files or user projects. "
     "When the user asks to find/search files on disk, inspect code structure, open apps, do calculations, or perform system tasks, "
     "you MUST call the appropriate tool. NEVER claim that you lack access to local files or tools."
@@ -96,6 +97,15 @@ class PromptBuilder:
                 f"=== END CONTEXT ===\n"
                 f"Answer the user's prompt using the reference context above when relevant. "
                 f"Cite specific sections, pages, or symbols when applicable."
+            )
+
+        if "ATTACHED IMAGE FILE:" in (context or "") or images:
+            sys_content += (
+                "\n\n[MANDATORY ATTACHED IMAGE DIRECTIVE]\n"
+                "The user has attached an image or screenshot to this request. "
+                "Because you cannot see image pixels directly, you MUST invoke the `inspect_image` tool "
+                "to transcribe and inspect the visual content, code, and styling before answering. "
+                "Do NOT guess or answer with generic assumptions without inspecting the image first."
             )
 
         messages: list[dict[str, Any]] = [{"role": "system", "content": sys_content}]

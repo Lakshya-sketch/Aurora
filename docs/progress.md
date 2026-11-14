@@ -6,6 +6,20 @@ down.
 
 ---
 
+## Entry 92 — 2026-11-14
+
+### Enforced Vision Tool Calling Directives for Attached Images
+
+**Implemented Actions & Enhancements:**
+1. **Mandatory Vision System Directives (`core_logic/prompt_builder.py`):**
+   - Added an explicit `MANDATORY VISION DIRECTIVE` to `BASE_SYSTEM_INSTRUCTIONS` explaining that the text LLM cannot perceive raw pixels directly and must call `inspect_image` when analyzing user-referenced images, code styling, or screenshots.
+   - Added dynamic injection of `[MANDATORY ATTACHED IMAGE DIRECTIVE]` in `PromptBuilder.build_messages()` whenever an image file is attached to the request, commanding the model to inspect and transcribe the image via `inspect_image` before providing its answer.
+2. **Automated Testing & Verification (`tests/test_prompt_builder.py`):**
+   - Added unit test `test_prompt_builder_enforces_inspect_image_directive` confirming the injection of the mandatory vision directive.
+   - Verified 189/189 tests pass repository-wide (`pytest`).
+
+---
+
 ## Entry 91 — 2026-11-14
 
 ### Host Environment Context Injection & Windows System File Guard Implementation
